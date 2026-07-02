@@ -16,13 +16,14 @@ def main():
     text = input("> ")
 
     try:
-        result = summarize_text(text)
+        result = summarize_text(text, config)
         output_path = save_summary(config["output_dir"], result.title, result.summary)
     except ValueError as error:
         print(f"输入错误：{error}")
         return
 
     print(f"摘要已保存到：{output_path}")
+    print(f"摘要来源：{result.source}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from dotenv import load_dotenv
 
@@ -14,4 +15,7 @@ def load_config():
 
     return {
         "output_dir": OUTPUT_DIR,
+        "openai_api_key": os.getenv("OPENAI_API_KEY", ""),
+        "openai_model": os.getenv("OPENAI_MODEL", "gpt-5.5"),
+        "openai_api_base": os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
     }
