@@ -12,14 +12,14 @@
 
 ## 运行方式
 
-先复制 `.env.example` 为 `.env`，然后把 `OPENAI_API_KEY` 改成自己的 API key。
+先复制 `.env.example` 为 `.env`，然后把 `DEEPSEEK_API_KEY` 改成自己的 API key。
 
 ```powershell
 .venv\Scripts\Activate.ps1
 python src\main.py
 ```
 
-如果没有配置 API key，程序会自动使用本地规则摘要，方便先跑通流程。
+如果没有配置 DeepSeek API key，程序会自动使用本地规则摘要，方便先跑通流程。
 
 ## 项目结构
 
@@ -33,7 +33,7 @@ agent_learning/
 ├── src/
 │   ├── main.py
 │   ├── config.py
-│   ├── openai_client.py
+│   ├── llm_client.py
 │   └── summarizer.py
 └── outputs/
 ```

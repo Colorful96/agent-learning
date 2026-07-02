@@ -15,7 +15,7 @@ def load_config():
 
     return {
         "output_dir": OUTPUT_DIR,
-        "openai_api_key": os.getenv("OPENAI_API_KEY", ""),
-        "openai_model": os.getenv("OPENAI_MODEL", "gpt-5.5"),
-        "openai_api_base": os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1"),
+        "deepseek_api_key": os.getenv("DEEPSEEK_API_KEY", ""),
+        "deepseek_model": os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        "deepseek_api_base": os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com"),
     }
