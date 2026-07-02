@@ -21,6 +21,12 @@ python src\main.py
 
 如果没有配置 DeepSeek API key，程序会自动使用本地规则摘要，方便先跑通流程。
 
+运行日志会保存到：
+
+```text
+outputs/app.log
+```
+
 ## 项目结构
 
 ```text

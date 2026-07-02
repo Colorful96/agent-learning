@@ -1,6 +1,11 @@
+import logging
+
 from pydantic import BaseModel, Field
 
 from llm_client import generate_text, LLMClientError
+
+
+logger = logging.getLogger(__name__)
 
 
 class SummaryResult(BaseModel):
@@ -49,7 +54,8 @@ def summarize_text(text: str, config) -> SummaryResult:
             system_prompt=system_prompt,
             user_input=cleaned_text,
         )
-    except LLMClientError:
+    except LLMClientError as error:
+        logger.warning("DeepSeek API failed, falling back to local rule: %s", error)
         return summarize_text_locally(cleaned_text)
 
     return SummaryResult(

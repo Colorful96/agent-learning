@@ -15,6 +15,7 @@ def load_config():
 
     return {
         "output_dir": OUTPUT_DIR,
+        "log_file": OUTPUT_DIR / "app.log",
         "deepseek_api_key": os.getenv("DEEPSEEK_API_KEY", ""),
         "deepseek_model": os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         "deepseek_api_base": os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com"),
