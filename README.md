@@ -19,6 +19,12 @@
 python src\main.py
 ```
 
+也可以摘要一个 txt 文件：
+
+```powershell
+python src\main.py examples\sample.txt
+```
+
 如果没有配置 DeepSeek API key，程序会自动使用本地规则摘要，方便先跑通流程。
 
 运行日志会保存到：
@@ -36,6 +42,8 @@ agent_learning/
 ├── .env.example
 ├── .env
 ├── .gitignore
+├── examples/
+│   └── sample.txt
 ├── src/
 │   ├── main.py
 │   ├── config.py

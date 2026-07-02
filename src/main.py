@@ -1,4 +1,6 @@
 import logging
+import sys
+from pathlib import Path
 
 from config import load_config
 from summarizer import summarize_text
@@ -22,15 +24,28 @@ def save_summary(output_dir, title: str, summary: str):
     return output_path
 
 
+def read_input_text(args):
+    if not args:
+        print("请输入一段需要摘要的文本，输入完成后按回车：")
+        return input("> ")
+
+    input_path = Path(args[0])
+    if not input_path.exists():
+        raise ValueError(f"文件不存在：{input_path}")
+
+    if not input_path.is_file():
+        raise ValueError(f"输入路径不是文件：{input_path}")
+
+    return input_path.read_text(encoding="utf-8")
+
+
 def main():
     config = load_config()
     setup_logging(config["log_file"])
     logger = logging.getLogger(__name__)
 
-    print("请输入一段需要摘要的文本，输入完成后按回车：")
-    text = input("> ")
-
     try:
+        text = read_input_text(sys.argv[1:])
         result = summarize_text(text, config)
         output_path = save_summary(config["output_dir"], result.title, result.summary)
     except ValueError as error:

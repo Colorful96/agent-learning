@@ -1,0 +1,3 @@
+Agent development is not just about chatting with a large language model.
+It also includes project structure, configuration, logging, error handling,
+tool calling, retrieval, evaluation, and deployment.
