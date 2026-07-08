@@ -18,7 +18,9 @@ def extract_chat_content(response_json):
     return content
 
 
-def generate_text(api_key, model, api_base, system_prompt, user_input):
+def generate_text(
+    api_key, model, api_base, system_prompt, user_input, response_format=None
+):
     if not api_key:
         raise LLMClientError("DEEPSEEK_API_KEY is not configured.")
 
@@ -35,8 +37,11 @@ def generate_text(api_key, model, api_base, system_prompt, user_input):
         ],
         "thinking": {"type": "disabled"},
         "stream": False,
-        "max_tokens": 300,
+        "max_tokens": 600,
     }
+
+    if response_format:
+        payload["response_format"] = response_format
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=60)

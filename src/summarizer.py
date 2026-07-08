@@ -1,9 +1,9 @@
 import logging
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from llm_client import generate_text, LLMClientError
-
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +12,58 @@ class SummaryResult(BaseModel):
     title: str = Field(description="A short title for the summary")
     summary: str = Field(description="The generated summary")
     source: str = Field(description="Where the summary came from")
+
+
+class StructuredSummary(BaseModel):
+    topic: str = Field(description="The main topic of the text")
+    summary: str = Field(description="A concise summary")
+    keywords: list[str] = Field(description="Important keywords")
+    action_items: list[str] = Field(description="Suggested next actions")
+
+
+class StructuredOutputError(Exception):
+    pass
+
+
+def analyze_text_structured(text: str, config) -> StructuredSummary:
+    cleaned_text = text.strip()
+
+    if not cleaned_text:
+        raise ValueError("Text cannot be empty.")
+
+    system_prompt = (
+        "You are a careful study assistant. Analyze the user's text and return JSON only. "
+        "The JSON object must contain exactly these fields: "
+        "topic, summary, keywords, action_items. "
+        "topic must be a Chinese string. "
+        "summary must be a Chinese string within 150 Chinese characters. "
+        "keywords must be a list of strings. "
+        "action_items must be a list of strings. "
+        "Do not output markdown. Do not output explanations. Output valid JSON only."
+    )
+
+    raw_output = generate_text(
+        api_key=config["deepseek_api_key"],
+        model=config["deepseek_model"],
+        api_base=config["deepseek_api_base"],
+        system_prompt=system_prompt,
+        user_input=cleaned_text,
+        response_format={"type": "json_object"},
+    )
+
+    try:
+        data = json.loads(raw_output)
+    except json.JSONDecodeError as error:
+        logger.error("Invalid JSON from model: %s", raw_output)
+        raise StructuredOutputError("Model returned invalid JSON.") from error
+
+    try:
+        return StructuredSummary(**data)
+    except ValidationError as error:
+        logger.error("JSON did not match StructuredSummary: %s", data)
+        raise StructuredOutputError(
+            "Model returned JSON that does not match StructuredSummary."
+        ) from error
 
 
 def summarize_text_locally(text: str) -> SummaryResult:

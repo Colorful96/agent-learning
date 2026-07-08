@@ -1,18 +1,47 @@
 import logging
 import sys
 from pathlib import Path
+from docx import Document
 
 from config import load_config
-from summarizer import summarize_text
+from summarizer import summarize_text, analyze_text_structured, StructuredOutputError
+import json
+
+
+def save_structured_summary(output_dir, result):
+    markdown_path = output_dir / "structured_summary.md"
+    json_path = output_dir / "structured_summary.json"
+    markdown_content = (
+        f"# Topic\n\n {result.topic}\n\n"
+        f"## Summary\n\n{result.summary}\n\n"
+        f"## Keywords\n\n"
+        + "\n".join(f"- {keyword}" for keyword in result.keywords)
+        + "\n\n## Action Items\n\n"
+        + "\n".join(f"- {item}" for item in result.action_items)
+        + "\n"
+    )
+    # json_content = json.dumps({"topic": result.topic, "summary": result.summary, "keywords": result.keywords, "action_items": result.action_items}, ensure_ascii=False, indent=2)
+    json_content = json.dumps(result.model_dump(), ensure_ascii=False, indent=2)
+
+    markdown_path.write_text(markdown_content, encoding="utf-8")
+    json_path.write_text(json_content, encoding="utf-8")
+    return markdown_path
 
 
 def setup_logging(log_file):
+    """
+    配置日志记录功能
+    Args:
+        log_file (str): 日志文件的路径
+    """
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s - %(message)s",
-        handlers=[
-            logging.FileHandler(str(log_file), encoding="utf-8"),
-            logging.StreamHandler(),
+        level=logging.INFO,  # 设置日志级别为INFO，记录INFO及以上级别的日志
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s",  # 设置日志格式，包含时间、日志级别、名称和消息
+        handlers=[  # 配置日志处理器，同时输出到文件和控制台
+            logging.FileHandler(
+                str(log_file), encoding="utf-8"
+            ),  # 输出到文件，使用UTF-8编码
+            logging.StreamHandler(),  # 输出到控制台
         ],
     )
 
@@ -22,6 +51,18 @@ def save_summary(output_dir, title: str, summary: str):
     content = f"# {title}\n\n{summary}\n"
     output_path.write_text(content, encoding="utf-8")
     return output_path
+
+
+def read_docx_text(input_path):
+    document = Document(input_path)
+    paragraphs = []
+
+    for paragraph in document.paragraphs:
+        text = paragraph.text.strip()
+        if text:
+            paragraphs.append(text)
+
+    return "\n".join(paragraphs)
 
 
 def read_input_text(args):
@@ -35,6 +76,10 @@ def read_input_text(args):
 
     if not input_path.is_file():
         raise ValueError(f"输入路径不是文件：{input_path}")
+    suffix = input_path.suffix.lower()
+
+    if suffix == ".docx":
+        return read_docx_text(input_path)
 
     return input_path.read_text(encoding="utf-8")
 
@@ -45,17 +90,33 @@ def main():
     logger = logging.getLogger(__name__)
 
     try:
-        text = read_input_text(sys.argv[1:])
-        result = summarize_text(text, config)
-        output_path = save_summary(config["output_dir"], result.title, result.summary)
+        args = sys.argv[1:]
+        structured_mode = "--structured" in args
+        args = [arg for arg in args if arg != "--structured"]
+
+        text = read_input_text(args)
+
+        if structured_mode:
+            result = analyze_text_structured(text, config)
+            output_path = save_structured_summary(config["output_dir"], result)
+            source = "deepseek_structured_json"
+        else:
+            result = summarize_text(text, config)
+            output_path = save_summary(
+                config["output_dir"], result.title, result.summary
+            )
+            source = result.source
     except ValueError as error:
         logger.warning("Invalid input: %s", error)
         print(f"输入错误：{error}")
+    except StructuredOutputError as error:
+        logger.error("Structured output failed: %s", error)
+        print(f"结构化输出失败：{error}")
         return
 
-    logger.info("Summary saved to %s with source=%s", output_path, result.source)
+    logger.info("Summary saved to %s with source=%s", output_path, source)
     print(f"摘要已保存到：{output_path}")
-    print(f"摘要来源：{result.source}")
+    print(f"摘要来源：{source}")
 
 
 if __name__ == "__main__":
