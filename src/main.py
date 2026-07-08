@@ -8,9 +8,9 @@ from summarizer import summarize_text, analyze_text_structured, StructuredOutput
 import json
 
 
-def save_structured_summary(output_dir, result):
-    markdown_path = output_dir / "structured_summary.md"
-    json_path = output_dir / "structured_summary.json"
+def save_structured_summary(output_dir, result, style="default"):
+    markdown_path = output_dir / f"structured_summary_{style}.md"
+    json_path = output_dir / f"structured_summary_{style}.json"
     markdown_content = (
         f"# Topic\n\n {result.topic}\n\n"
         f"## Summary\n\n{result.summary}\n\n"
@@ -91,24 +91,70 @@ def main():
 
     try:
         args = sys.argv[1:]
+
         structured_mode = "--structured" in args
         args = [arg for arg in args if arg != "--structured"]
+
+        style = "default"
+        if "--style" in args:
+            style_index = args.index("--style")
+
+            if style_index + 1 >= len(args):
+                raise ValueError(
+                    "--style 后面需要指定风格，例如 concise、research 或 action"
+                )
+
+            style = args[style_index + 1]
+            args = args[:style_index] + args[style_index + 2 :]
 
         text = read_input_text(args)
 
         if structured_mode:
-            result = analyze_text_structured(text, config)
-            output_path = save_structured_summary(config["output_dir"], result)
-            source = "deepseek_structured_json"
+            if style == "all":
+                styles = ["concise", "research", "action"]
+                output_paths = []
+
+                for current_style in styles:
+                    result = analyze_text_structured(text, config, style=current_style)
+                    output_path = save_structured_summary(
+                        config["output_dir"],
+                        result,
+                        style=current_style,
+                    )
+                    output_paths.append(output_path)
+
+                output_path = output_paths[-1]
+                source = "deepseek_structured_json_all"
+            else:
+                result = analyze_text_structured(text, config, style=style)
+                output_path = save_structured_summary(
+                    config["output_dir"],
+                    result,
+                    style=style,
+                )
+                source = "deepseek_structured_json"
         else:
             result = summarize_text(text, config)
             output_path = save_summary(
                 config["output_dir"], result.title, result.summary
             )
             source = result.source
+        # if structured_mode:
+        #     result = analyze_text_structured(text, config, style=style)
+        #     output_path = save_structured_summary(
+        #         config["output_dir"], result, style=style
+        #     )
+        #     source = "deepseek_structured_json"
+        # else:
+        #     result = summarize_text(text, config)
+        #     output_path = save_summary(
+        #         config["output_dir"], result.title, result.summary
+        #     )
+        #     source = result.source
     except ValueError as error:
         logger.warning("Invalid input: %s", error)
         print(f"输入错误：{error}")
+        return
     except StructuredOutputError as error:
         logger.error("Structured output failed: %s", error)
         print(f"结构化输出失败：{error}")
