@@ -1,9 +1,9 @@
+import json
 import logging
 
 from pydantic import BaseModel, Field, ValidationError
 
-from llm_client import generate_text, LLMClientError
-import json
+from src.clients.llm_client import LLMClientError, generate_text
 
 logger = logging.getLogger(__name__)
 

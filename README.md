@@ -23,7 +23,7 @@
 查看命令帮助：
 
 ```powershell
-python src\main.py --help
+python -m src.main --help
 ```
 
 ### 普通摘要
@@ -31,19 +31,19 @@ python src\main.py --help
 手动输入文本：
 
 ```powershell
-python src\main.py
+python -m src.main
 ```
 
 摘要一个文本文件：
 
 ```powershell
-python src\main.py examples\sample.txt
+python -m src.main examples\sample.txt
 ```
 
 摘要复杂样例：
 
 ```powershell
-python src\main.py examples\agent_complex.txt
+python -m src.main examples\agent_complex.txt
 ```
 
 程序会输出：
@@ -57,19 +57,19 @@ outputs/summary.md
 默认结构化输出：
 
 ```powershell
-python src\main.py examples\agent_complex.txt --structured
+python -m src.main examples\agent_complex.txt --structured
 ```
 
 指定 prompt 风格：
 
 ```powershell
-python src\main.py examples\agent_complex.txt --structured --style research
+python -m src.main examples\agent_complex.txt --structured --style research
 ```
 
 一次生成全部风格：
 
 ```powershell
-python src\main.py examples\agent_complex.txt --structured --style all
+python -m src.main examples\agent_complex.txt --structured --style all
 ```
 
 支持的风格：
@@ -94,19 +94,33 @@ outputs/structured_summary_research.json
 先生成结构化结果：
 
 ```powershell
-python src\main.py examples\agent_complex.txt --structured --style all
+python -m src.main examples\agent_complex.txt --structured --style all
 ```
 
 再运行评测：
 
 ```powershell
-python src\evaluator.py
+python -m src.core.evaluator
 ```
 
 评测报告会保存到：
 
 ```text
 outputs/evaluation_report.json
+```
+
+### 工具函数 Demo
+
+直接测试本地工具函数：
+
+```powershell
+python -m src.demos.tool_demo
+```
+
+测试工具注册表：
+
+```powershell
+python -m src.demos.tool_registry_demo
 ```
 
 如果没有配置 DeepSeek API key，程序会自动使用本地规则摘要，方便先跑通流程。
@@ -133,11 +147,24 @@ agent_learning/
 ├── prompts/
 │   └── structured_summary_prompts.md
 ├── src/
+│   ├── __init__.py
 │   ├── main.py
 │   ├── config.py
-│   ├── evaluator.py
-│   ├── llm_client.py
-│   └── summarizer.py
+│   ├── clients/
+│   │   ├── __init__.py
+│   │   └── llm_client.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── evaluator.py
+│   │   └── summarizer.py
+│   ├── tools/
+│   │   ├── __init__.py
+│   │   ├── local_tools.py
+│   │   └── registry.py
+│   └── demos/
+│       ├── __init__.py
+│       ├── tool_demo.py
+│       └── tool_registry_demo.py
 └── outputs/
 ```
 
@@ -154,6 +181,8 @@ DeepSeek API 调用
 Markdown 输出
 JSON 输出
 结构化输出规则评测
+本地工具函数
+工具注册表
 日志记录
 ```
 

@@ -1,11 +1,16 @@
 import logging
 import argparse
+import json
 from pathlib import Path
+
 from docx import Document
 
-from config import load_config
-from summarizer import summarize_text, analyze_text_structured, StructuredOutputError
-import json
+from src.config import load_config
+from src.core.summarizer import (
+    StructuredOutputError,
+    analyze_text_structured,
+    summarize_text,
+)
 
 
 def save_structured_summary(output_dir, result, style="default"):
