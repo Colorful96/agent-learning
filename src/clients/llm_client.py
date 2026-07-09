@@ -57,3 +57,51 @@ def generate_text(
         )
 
     return extract_chat_content(response.json())
+
+
+def create_chat_completion(api_key, model, api_base, messages, tools=None):
+    """Call DeepSeek chat completions with optional tools."""
+    if not api_key:
+        raise LLMClientError("DEEPSEEK_API_KEY is not configured.")
+
+    url = api_base.rstrip("/") + "/chat/completions"
+    headers = {
+        "Authorization": "Bearer " + api_key,
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+    }
+
+    if tools:
+        payload["tools"] = tools
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+    except requests.RequestException as error:
+        raise LLMClientError("Failed to connect to DeepSeek API: " + str(error))
+
+    if response.status_code >= 400:
+        raise LLMClientError(
+            "DeepSeek API returned status {0}: {1}".format(
+                response.status_code,
+                response.text,
+            )
+        )
+
+    return response.json()
+
+
+def get_first_message(response_json):
+    """Extract the first assistant message from a chat completion response."""
+    choices = response_json.get("choices", [])
+    if not choices:
+        raise LLMClientError("The API response did not contain choices.")
+
+    message = choices[0].get("message")
+    if not message:
+        raise LLMClientError("The API response did not contain a message.")
+
+    return message
