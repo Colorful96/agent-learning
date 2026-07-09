@@ -1,5 +1,6 @@
 import logging
 import sys
+import argparse
 from pathlib import Path
 from docx import Document
 
@@ -53,6 +54,33 @@ def save_summary(output_dir, title: str, summary: str):
     return output_path
 
 
+def parse_cli_args():
+    parser = argparse.ArgumentParser(
+        description="Summarize text files with optional structured JSON output."
+    )
+
+    parser.add_argument(
+        "input_path",
+        nargs="?",
+        help="Path to a UTF-8 text, Markdown, or docx file. If omitted, read from terminal input.",
+    )
+
+    parser.add_argument(
+        "--structured",
+        action="store_true",
+        help="Generate structured summary output.",
+    )
+
+    parser.add_argument(
+        "--style",
+        choices=["default", "concise", "research", "action", "all"],
+        default="default",
+        help="Prompt style for structured output.",
+    )
+
+    return parser.parse_args()
+
+
 def read_docx_text(input_path):
     document = Document(input_path)
     paragraphs = []
@@ -90,27 +118,13 @@ def main():
     logger = logging.getLogger(__name__)
 
     try:
-        args = sys.argv[1:]
+        cli_args = parse_cli_args()
+        input_args = [cli_args.input_path] if cli_args.input_path else []
 
-        structured_mode = "--structured" in args
-        args = [arg for arg in args if arg != "--structured"]
+        text = read_input_text(input_args)
 
-        style = "default"
-        if "--style" in args:
-            style_index = args.index("--style")
-
-            if style_index + 1 >= len(args):
-                raise ValueError(
-                    "--style 后面需要指定风格，例如 concise、research 或 action"
-                )
-
-            style = args[style_index + 1]
-            args = args[:style_index] + args[style_index + 2 :]
-
-        text = read_input_text(args)
-
-        if structured_mode:
-            if style == "all":
+        if cli_args.structured:
+            if cli_args.style == "all":
                 styles = ["concise", "research", "action"]
                 output_paths = []
 
@@ -126,11 +140,11 @@ def main():
                 output_path = output_paths[-1]
                 source = "deepseek_structured_json_all"
             else:
-                result = analyze_text_structured(text, config, style=style)
+                result = analyze_text_structured(text, config, style=cli_args.style)
                 output_path = save_structured_summary(
                     config["output_dir"],
                     result,
-                    style=style,
+                    style=cli_args.style,
                 )
                 source = "deepseek_structured_json"
         else:
