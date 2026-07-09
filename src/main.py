@@ -1,5 +1,4 @@
 import logging
-import sys
 import argparse
 from pathlib import Path
 from docx import Document
@@ -153,18 +152,6 @@ def main():
                 config["output_dir"], result.title, result.summary
             )
             source = result.source
-        # if structured_mode:
-        #     result = analyze_text_structured(text, config, style=style)
-        #     output_path = save_structured_summary(
-        #         config["output_dir"], result, style=style
-        #     )
-        #     source = "deepseek_structured_json"
-        # else:
-        #     result = summarize_text(text, config)
-        #     output_path = save_summary(
-        #         config["output_dir"], result.title, result.summary
-        #     )
-        #     source = result.source
     except ValueError as error:
         logger.warning("Invalid input: %s", error)
         print(f"输入错误：{error}")
