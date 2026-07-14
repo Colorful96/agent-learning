@@ -12,6 +12,10 @@
 - 关键词版 RAG
 - embedding + Chroma 语义检索版 RAG
 - 多文档本地知识库问答
+- Workflow 与 LangGraph
+- Planner、Retriever、Reader、Reviewer、Writer 角色节点
+- 条件路由、审核循环和计划校验
+- 节点执行状态与运行轨迹保存
 
 ## 当前目标
 
@@ -170,6 +174,39 @@ python -m src.demos.semantic_rag_demo "RAG 通常包括哪些步骤？" --top-k 
 python -m src.rag.semantic_rag_evaluator
 ```
 
+### LangGraph 研究 Workflow
+
+运行基于 LangGraph 的科研文献研究工作流：
+
+```powershell
+python -m src.demos.langgraph_research_demo "FastAPI 在这个项目里有什么作用？"
+```
+
+工作流主要经过：
+
+```text
+Planner
+-> PlanValidator
+-> Retriever
+-> Reader
+-> Reviewer
+-> Writer
+```
+
+查看 Graph 的 Mermaid 结构：
+
+```powershell
+Get-Content -Encoding UTF8 outputs\langgraph_workflow.mmd
+```
+
+查看最终状态和执行轨迹：
+
+```powershell
+Get-Content -Encoding UTF8 outputs\langgraph_final_state.json
+```
+
+最终状态中包含计划、检索结果、回答、当前节点、已完成节点、计划进度和执行轨迹。
+
 ## 输出文件
 
 运行过程中会生成一些本地输出：
@@ -184,7 +221,10 @@ outputs/
 ├── tool_agent_messages.json
 ├── long_term_memory.jsonl
 ├── rag_debug_trace.json
-└── semantic_rag_debug_trace.json
+├── semantic_rag_debug_trace.json
+├── langgraph_workflow.mmd
+├── langgraph_final_state.json
+└── langgraph_research_report.md
 ```
 
 这些文件用于调试和学习复盘，不提交到 Git。
@@ -216,6 +256,9 @@ agent_learning/
 │   ├── main.py
 │   ├── config.py
 │   ├── agents/
+│   │   ├── planner.py
+│   │   ├── research_roles.py
+│   │   ├── research_state.py
 │   │   └── tool_agent.py
 │   ├── clients/
 │   │   └── llm_client.py
@@ -223,12 +266,12 @@ agent_learning/
 │   │   ├── evaluator.py
 │   │   └── summarizer.py
 │   ├── demos/
-│   │   ├── build_rag_index.py
-│   │   ├── list_rag_sources.py
+│   │   ├── langgraph_research_demo.py
+│   │   ├── langgraph_trace_demo.py
+│   │   ├── manual_workflow_demo.py
 │   │   ├── model_tool_call_demo.py
 │   │   ├── rag_demo.py
 │   │   ├── semantic_rag_demo.py
-│   │   ├── tool_demo.py
 │   │   └── tool_registry_demo.py
 │   ├── memory/
 │   │   └── long_term_memory.py
@@ -236,16 +279,17 @@ agent_learning/
 │   │   ├── chroma_store.py
 │   │   ├── chunker.py
 │   │   ├── embedding.py
-│   │   ├── keyword_retriever.py
-│   │   ├── rag_evaluator.py
+│   │   ├── hybrid_retriever.py
+│   │   ├── reranker.py
 │   │   └── semantic_rag_evaluator.py
-│   └── tools/
-│       ├── local_tools.py
-│       └── registry.py
+│   ├── tools/
+│   │   ├── local_tools.py
+│   │   └── registry.py
+│   └── workflows/
+│       └── langgraph_research_workflow.py
 ├── outputs/
 └── data/
 ```
-
 ## 当前能力
 
 ```text
@@ -267,6 +311,13 @@ embedding 语义检索
 Chroma 向量数据库
 多文档知识库检索
 引用来源 chunk_id/source
+LangGraph StateGraph
+条件边与循环边
+Planner 计划生成
+PlanValidator 计划校验
+Reviewer 结果审核
+current_step 与 completed_steps
+execution_trace 运行轨迹
 ```
 
 ## 开发节奏
@@ -284,13 +335,24 @@ Chroma 向量数据库
 8. Git 提交
 ```
 
-第四周结束后，下一阶段进入 RAG 优化与评测：
+当前学习进度已经完成第七周的主要内容：
 
 ```text
-批量评测
-召回失败分析
-chunk 参数对比
-top-k / max-distance 调参
-幻觉控制
-答案忠实性检查
+Workflow 与 LangGraph
+StateGraph 节点注册
+普通边和条件边
+Planner 与 PlanValidator
+Reader 与 Reviewer 循环
+计划进度和运行轨迹
+```
+
+第八周将进入应用集成与部署：
+
+```text
+FastAPI 接口
+请求和响应模型
+统一异常处理
+API 测试
+简单前端调用
+README 和部署说明
 ```
