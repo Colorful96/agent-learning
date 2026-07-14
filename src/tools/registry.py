@@ -1,4 +1,9 @@
-from src.tools.local_tools import count_text_stats, read_text_file, save_markdown_report
+from src.tools.local_tools import (
+    count_text_stats,
+    read_text_file,
+    save_markdown_report,
+    search_knowledge_base,
+)
 
 TOOL_SCHEMAS = [
     {
@@ -60,6 +65,38 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_knowledge_base",
+            "description": (
+                "Search the local knowledge base and return "
+                "relevant chunks with source citations."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "The question to search for.",
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "Number of chunks to return.",
+                        "default": 3,
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": (
+                            "Optional source file path. "
+                            "Search all sources when omitted."
+                        ),
+                    },
+                },
+                "required": ["question"],
+            },
+        },
+    },
 ]
 
 
@@ -67,6 +104,7 @@ TOOL_FUNCTIONS = {
     "read_text_file": read_text_file,
     "count_text_stats": count_text_stats,
     "save_markdown_report": save_markdown_report,
+    "search_knowledge_base": search_knowledge_base,
 }
 
 

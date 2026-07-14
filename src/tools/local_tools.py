@@ -31,3 +31,36 @@ def save_markdown_report(title: str, content: str, output_path: str) -> str:
     path.write_text(markdown, encoding="utf-8")
 
     return str(path)
+
+
+def search_knowledge_base(
+    question: str,
+    top_k: int = 3,
+    source: str | None = None,
+) -> dict:
+    """从本地知识库检索和问题相关的资料。"""
+
+    # 延迟导入，避免程序启动时立即加载重排序模型
+    from src.rag.hybrid_retriever import retrieve_hybrid
+    from src.rag.reranker import rerank
+
+    # 先使用混合检索获取较多候选资料
+    candidates = retrieve_hybrid(
+        question=question,
+        source=source,
+        top_k=max(top_k * 3, 10),
+        max_distance=0.9,
+    )
+
+    # 再使用重排序模型选出最相关的资料
+    retrieved_items = rerank(
+        question=question,
+        candidates=candidates,
+        top_k=top_k,
+    )
+
+    return {
+        "question": question,
+        "count": len(retrieved_items),
+        "items": retrieved_items,
+    }

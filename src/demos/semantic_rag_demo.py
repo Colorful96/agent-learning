@@ -4,7 +4,10 @@ from pathlib import Path
 
 from src.clients.llm_client import LLMClientError, generate_text
 from src.config import load_config
-from src.rag.chroma_store import query_vector_index
+
+# from src.rag.chroma_store import query_vector_index
+from src.rag.hybrid_retriever import retrieve_hybrid
+from src.rag.reranker import rerank
 
 
 def parse_args():
@@ -113,11 +116,17 @@ def main():
     config = load_config()
 
     # 这里属于在线问答阶段：直接使用已经构建好的 Chroma 索引。
-    retrieved_items = query_vector_index(
+    candidate_items = retrieve_hybrid(
         question=args.question,
         source=args.file,
-        top_k=args.top_k,
+        top_k=max(args.top_k * 3, 10),
         max_distance=args.max_distance,
+    )
+
+    retrieved_items = rerank(
+        question=args.question,
+        candidates=candidate_items,
+        top_k=args.top_k,
     )
 
     if not retrieved_items:
