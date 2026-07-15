@@ -5,6 +5,7 @@ class ResearchGraphState(TypedDict, total=False):
     """研究工作流中所有角色共享的状态。"""
 
     question: str
+    conversation_history: list[dict]
     output_path: str
     plan: list[str]
     retrieved_items: list[dict]
@@ -29,3 +30,5 @@ class ResearchGraphState(TypedDict, total=False):
     plan_index: int
     current_plan_step: str
     completed_plan_steps: list[str]
+
+    retrieval_question: str

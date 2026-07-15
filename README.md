@@ -1,35 +1,85 @@
 # Agent Learning
 
-这是一个智能体开发学习项目，目标是逐步完成一个可展示的科研文献智能体。
+这是一个用于学习智能体开发的科研文献 Agent 应用 Demo。
 
-当前项目已经覆盖：
+项目目标是让 Agent 能够读取 TXT、Word 和 PDF 资料，建立本地知识库，根据用户问题进行检索和分析，生成带引用来源的研究回答，并通过 FastAPI 和 Streamlit 提供可交互的应用界面。
 
-- LLM API 调用
-- Prompt 与结构化输出
-- 本地工具调用
-- Agent 工具循环
-- 短期记忆与长期记忆
-- 关键词版 RAG
-- embedding + Chroma 语义检索版 RAG
-- 多文档本地知识库问答
-- Workflow 与 LangGraph
-- Planner、Retriever、Reader、Reviewer、Writer 角色节点
-- 条件路由、审核循环和计划校验
-- 节点执行状态与运行轨迹保存
+## 当前定位
 
-## 当前目标
+当前项目已经是一个具备 Agent 特征的科研文献应用 Demo，但还不是生产级智能体平台。
 
-阶段目标是构建一个本地科研资料问答原型：
+当前主流程如下：
 
 ```text
-资料文件
--> chunk 切片
--> embedding 向量化
--> 写入 Chroma 向量数据库
--> 用户提问
--> 语义检索相关 chunk
--> DeepSeek 基于检索内容回答
--> 返回引用来源
+用户问题
+    -> FastAPI
+    -> LangGraph Research Workflow
+    -> Planner
+    -> PlanValidator
+    -> QueryRewriter
+    -> Retriever
+    -> Reader
+    -> Reviewer
+    -> Writer
+    -> 返回回答、引用来源和 Markdown 报告
+```
+
+## 已实现功能
+
+### 模型与提示词
+
+- 使用 DeepSeek API 调用大语言模型
+- 普通文本摘要
+- 结构化 JSON 输出
+- 多种 Prompt 风格
+- Pydantic 结果校验
+- 规则评测和语义 RAG 评测
+
+### Agent 工程能力
+
+- 本地工具调用
+- 工具注册表
+- 多轮工具调用
+- Planner 任务计划
+- PlanValidator 计划校验
+- LangGraph StateGraph 工作流
+- Reader、Reviewer、Writer 等角色节点
+- 条件路由和 Reviewer 循环
+- `current_step`、`completed_steps` 和执行轨迹
+
+### RAG 知识库
+
+- TXT、DOCX、PDF 文档解析
+- chunk 切分
+- embedding 向量化
+- Chroma 本地向量数据库
+- 语义检索
+- 可选 reranker
+- 返回 `chunk_id`、来源文件和文本位置
+- 文档上传、列表和删除
+
+### 记忆与应用接口
+
+- Streamlit 页面短期对话
+- JSONL 长期记忆 Demo
+- SQLite 会话和消息持久化
+- 页面刷新后恢复历史会话
+- FastAPI 研究接口
+- Markdown 报告下载接口
+- API 请求日志和统一异常处理
+- FastAPI 接口测试
+
+## 当前架构
+
+```text
+Streamlit 前端
+    -> FastAPI API
+        -> LangGraph 工作流
+            -> Planner / Retriever / Reader / Reviewer / Writer
+                -> 本地工具
+                -> Chroma 向量数据库
+                -> DeepSeek API
+                -> SQLite 会话数据库
 ```
 
 ## 环境准备
@@ -47,31 +97,23 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-复制环境变量文件：
+创建环境变量文件：
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-然后在 `.env` 中填写自己的 DeepSeek API key：
+在 `.env` 中填写模型配置：
 
 ```text
 DEEPSEEK_API_KEY=your_api_key_here
-DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_API_BASE=https://api.deepseek.com
 ```
 
 ## 常用命令
 
-### 摘要工具
-
-查看命令帮助：
-
-```powershell
-python -m src.main --help
-```
-
-普通摘要：
+### 文本摘要
 
 ```powershell
 python -m src.main examples\sample.txt
@@ -83,120 +125,46 @@ python -m src.main examples\sample.txt
 python -m src.main examples\agent_complex.txt --structured
 ```
 
-指定 prompt 风格：
+指定 Prompt 风格：
 
 ```powershell
 python -m src.main examples\agent_complex.txt --structured --style research
 ```
 
-一次生成全部风格：
-
-```powershell
-python -m src.main examples\agent_complex.txt --structured --style all
-```
-
-评测结构化输出：
-
-```powershell
-python -m src.core.evaluator
-```
-
-### 工具调用 Agent
-
-直接测试本地工具函数：
-
-```powershell
-python -m src.demos.tool_demo
-```
-
-测试工具注册表：
+### 工具调用
 
 ```powershell
 python -m src.demos.tool_registry_demo
+python -m src.demos.model_tool_call_demo
 ```
 
-运行支持工具调用和记忆的 Agent：
+### RAG
 
-```powershell
-python -m src.demos.model_tool_call_demo "请读取 examples/agent_complex.txt，并统计它的字符数、行数和词数"
-```
-
-### 关键词版 RAG
-
-运行关键词检索版 RAG：
-
-```powershell
-python -m src.demos.rag_demo "我应该先学 LangChain 还是 LangGraph？" --file examples\agent_rag_notes.txt
-```
-
-评测最近一次关键词 RAG 结果：
-
-```powershell
-python -m src.rag.rag_evaluator
-```
-
-### 语义检索版 RAG
-
-先构建向量索引：
+建立向量索引：
 
 ```powershell
 python -m src.demos.build_rag_index --file examples\agent_rag_notes.txt
-python -m src.demos.build_rag_index --file examples\paper_notes.txt
 ```
 
-查看已经入库的资料：
+查看知识库来源：
 
 ```powershell
 python -m src.demos.list_rag_sources
 ```
 
-只检索指定文件：
+运行语义检索：
 
 ```powershell
-python -m src.demos.semantic_rag_demo "FastAPI 在这个项目里有什么作用？" --file examples\agent_rag_notes.txt
+python -m src.demos.semantic_rag_demo `
+    "FastAPI 在这个项目里有什么作用？" `
+    --file examples\agent_rag_notes.txt
 ```
 
-检索整个知识库：
+### LangGraph 研究工作流
 
 ```powershell
-python -m src.demos.semantic_rag_demo "科研文献智能体需要支持哪些资料来源？"
-```
-
-指定检索参数：
-
-```powershell
-python -m src.demos.semantic_rag_demo "RAG 通常包括哪些步骤？" --top-k 3 --max-distance 0.9
-```
-
-评测最近一次语义 RAG 结果：
-
-```powershell
-python -m src.rag.semantic_rag_evaluator
-```
-
-### LangGraph 研究 Workflow
-
-运行基于 LangGraph 的科研文献研究工作流：
-
-```powershell
-python -m src.demos.langgraph_research_demo "FastAPI 在这个项目里有什么作用？"
-```
-
-工作流主要经过：
-
-```text
-Planner
--> PlanValidator
--> Retriever
--> Reader
--> Reviewer
--> Writer
-```
-
-查看 Graph 的 Mermaid 结构：
-
-```powershell
-Get-Content -Encoding UTF8 outputs\langgraph_workflow.mmd
+python -m src.demos.langgraph_research_demo `
+    "FastAPI 在这个项目里有什么作用？"
 ```
 
 查看最终状态和执行轨迹：
@@ -205,154 +173,120 @@ Get-Content -Encoding UTF8 outputs\langgraph_workflow.mmd
 Get-Content -Encoding UTF8 outputs\langgraph_final_state.json
 ```
 
-最终状态中包含计划、检索结果、回答、当前节点、已完成节点、计划进度和执行轨迹。
+查看 Graph 结构：
 
-## 输出文件
-
-运行过程中会生成一些本地输出：
-
-```text
-outputs/
-├── summary.md
-├── structured_summary_*.md
-├── structured_summary_*.json
-├── evaluation_report.json
-├── tool_agent_trace.json
-├── tool_agent_messages.json
-├── long_term_memory.jsonl
-├── rag_debug_trace.json
-├── semantic_rag_debug_trace.json
-├── langgraph_workflow.mmd
-├── langgraph_final_state.json
-└── langgraph_research_report.md
+```powershell
+Get-Content -Encoding UTF8 outputs\langgraph_workflow.mmd
 ```
 
-这些文件用于调试和学习复盘，不提交到 Git。
+### 评测
 
-Chroma 本地向量数据库保存在：
-
-```text
-data/chroma/
+```powershell
+python -m pytest tests -ra
+python -m src.rag.semantic_rag_batch_eval
 ```
 
-它可以通过重新运行 `build_rag_index` 生成，也不提交到 Git。
+## 启动应用
+
+启动 FastAPI：
+
+```powershell
+python -m uvicorn src.api.app:app --reload
+```
+
+启动 Streamlit：
+
+```powershell
+python -m streamlit run frontend\streamlit_app.py
+```
+
+浏览器访问：
+
+```text
+http://localhost:8501
+```
+
+## 主要 API
+
+```text
+GET  /health
+POST /documents/upload
+GET  /documents
+DELETE /documents/{filename}
+POST /research
+GET  /reports/{filename}
+GET  /sessions/{session_id}/messages
+```
+
+示例：
+
+```powershell
+$body = @{
+    question = "FastAPI 在这个项目里有什么作用？"
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+    -Uri http://127.0.0.1:8000/research `
+    -Method Post `
+    -ContentType "application/json" `
+    -Body $body
+```
+
+## 数据目录
+
+```text
+data/uploads/       上传的 TXT、DOCX、PDF 文件
+data/chroma/        Chroma 向量数据库
+data/agent.db       SQLite 会话和消息数据库
+outputs/             报告、评测结果和运行轨迹
+```
+
+这些运行时数据默认不提交到 Git。
 
 ## 项目结构
 
 ```text
 agent_learning/
-├── README.md
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── examples/
-│   ├── sample.txt
-│   ├── agent_complex.txt
-│   ├── agent_rag_notes.txt
-│   └── paper_notes.txt
-├── prompts/
-│   └── structured_summary_prompts.md
+├── examples/                  示例资料
+├── frontend/
+│   └── streamlit_app.py       Streamlit 前端
+├── prompts/                   Prompt 文档
 ├── src/
-│   ├── main.py
-│   ├── config.py
-│   ├── agents/
-│   │   ├── planner.py
-│   │   ├── research_roles.py
-│   │   ├── research_state.py
-│   │   └── tool_agent.py
-│   ├── clients/
-│   │   └── llm_client.py
-│   ├── core/
-│   │   ├── evaluator.py
-│   │   └── summarizer.py
-│   ├── demos/
-│   │   ├── langgraph_research_demo.py
-│   │   ├── langgraph_trace_demo.py
-│   │   ├── manual_workflow_demo.py
-│   │   ├── model_tool_call_demo.py
-│   │   ├── rag_demo.py
-│   │   ├── semantic_rag_demo.py
-│   │   └── tool_registry_demo.py
-│   ├── memory/
-│   │   └── long_term_memory.py
-│   ├── rag/
-│   │   ├── chroma_store.py
-│   │   ├── chunker.py
-│   │   ├── embedding.py
-│   │   ├── hybrid_retriever.py
-│   │   ├── reranker.py
-│   │   └── semantic_rag_evaluator.py
-│   ├── tools/
-│   │   ├── local_tools.py
-│   │   └── registry.py
-│   └── workflows/
-│       └── langgraph_research_workflow.py
-├── outputs/
-└── data/
-```
-## 当前能力
-
-```text
-文本摘要
-docx 文件读取
-结构化 JSON 输出
-Pydantic 校验
-多风格 prompt
-规则评测
-本地工具调用
-工具注册表
-模型 Tool Calling
-多轮工具调用循环
-Agent trace
-短期记忆 messages
-长期记忆 JSONL
-关键词 RAG
-embedding 语义检索
-Chroma 向量数据库
-多文档知识库检索
-引用来源 chunk_id/source
-LangGraph StateGraph
-条件边与循环边
-Planner 计划生成
-PlanValidator 计划校验
-Reviewer 结果审核
-current_step 与 completed_steps
-execution_trace 运行轨迹
+│   ├── agents/                Agent 角色和状态
+│   ├── api/                   FastAPI 接口
+│   ├── clients/               大模型客户端
+│   ├── core/                  摘要和评测核心逻辑
+│   ├── demos/                 命令行 Demo
+│   ├── ingestion/             TXT、Word、PDF 解析
+│   ├── memory/                长期记忆 Demo
+│   ├── rag/                   切分、embedding、检索和向量库
+│   ├── storage/               SQLite 存储
+│   ├── tools/                 本地工具和工具注册表
+│   └── workflows/             LangGraph 工作流
+├── tests/                     自动化测试
+├── requirements.txt
+└── README.md
 ```
 
-## 开发节奏
-
-后续开发按这个方式推进：
+## 后续计划
 
 ```text
-1. 明确需求
-2. 拆分模块
-3. 写核心逻辑
-4. 写 demo 或测试入口
-5. 保存 trace
-6. 做简单评测
-7. 更新 README
-8. Git 提交
+1. 文档元数据和知识库筛选
+2. Planner 动态选择不同工作流分支
+3. MCP 外部工具接入
+4. Skill 能力模块封装
+5. 评测、日志、权限和安全完善
+6. 最后再考虑 Docker 部署
 ```
 
-当前学习进度已经完成第七周的主要内容：
+当前项目的学习重点是理解完整 Agent 应用的工程流程：
 
 ```text
-Workflow 与 LangGraph
-StateGraph 节点注册
-普通边和条件边
-Planner 与 PlanValidator
-Reader 与 Reviewer 循环
-计划进度和运行轨迹
-```
-
-第八周将进入应用集成与部署：
-
-```text
-FastAPI 接口
-请求和响应模型
-统一异常处理
-API 测试
-简单前端调用
-README 和部署说明
+需求
+    -> 模块设计
+    -> 工具和工作流实现
+    -> RAG 和记忆
+    -> API 和前端
+    -> 测试与评测
+    -> Git 版本管理
 ```

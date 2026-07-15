@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 outputs/
 data/
+data/*.db
+data/uploads/
+data/chroma/

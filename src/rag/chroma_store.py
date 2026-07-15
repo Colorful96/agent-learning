@@ -28,11 +28,20 @@ def get_collection(persist_dir="data/chroma", collection_name="agent-rag-notes")
     return client.get_or_create_collection(name=collection_name)
 
 
-def build_vector_index(file_path, chunk_size=300, overlap=50):
+def build_vector_index(
+    file_path,
+    chunk_size=300,
+    overlap=50,
+    text=None,
+):
     """读取文件，切片，向量化，并写入 Chroma。"""
 
     source = normalize_source(file_path)
-    text = Path(file_path).read_text(encoding="utf-8")
+    # TXT 可以直接读取，DOCX 和 PDF 使用外部解析结果
+    if text is None:
+        text = Path(file_path).read_text(
+            encoding="utf-8",
+        )
 
     chunks = split_text(text, chunk_size=chunk_size, overlap=overlap)
 
@@ -112,3 +121,23 @@ def query_vector_index(question, source=None, top_k=3, max_distance=None):
         )
 
     return retrieved_items
+
+
+def delete_vector_index_by_source(source: str) -> int:
+    """删除指定来源对应的所有向量切片。"""
+
+    collection = get_collection()
+    normalized_source = normalize_source(source)
+
+    result = collection.get(
+        where={
+            "source": normalized_source,
+        }
+    )
+
+    ids = result.get("ids", [])
+
+    if ids:
+        collection.delete(ids=ids)
+
+    return len(ids)

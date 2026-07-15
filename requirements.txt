@@ -5,3 +5,10 @@ python-docx==1.1.2
 sentence-transformers==5.6.0
 chromadb==1.5.9
 langgraph
+fastapi
+uvicorn
+pytest
+httpx
+streamlit
+pypdf
+python-multipart

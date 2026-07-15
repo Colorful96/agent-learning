@@ -13,7 +13,9 @@ from src.agents.research_roles import (
     route_after_review,
     unsupported_node,
     writer_node,
+    query_rewriter_node,
 )
+
 from src.agents.research_state import ResearchGraphState
 
 
@@ -70,9 +72,7 @@ def tracked_node(node_name, node_function):
 
         plan_index = state.get("plan_index", 0)
         current_plan_step = state.get("current_plan_step", "")
-        completed_plan_steps = list(
-            state.get("completed_plan_steps", [])
-        )
+        completed_plan_steps = list(state.get("completed_plan_steps", []))
 
         if plan_progress is not None:
             step_index, plan_step = plan_progress
@@ -131,7 +131,13 @@ def build_research_graph():
             plan_validator_node,
         ),
     )
-
+    builder.add_node(
+        "query_rewriter",
+        tracked_node(
+            "query_rewriter",
+            query_rewriter_node,
+        ),
+    )
     builder.add_node(
         "retriever",
         tracked_node("retriever", retriever_node),
@@ -174,9 +180,13 @@ def build_research_graph():
         "plan_validator",
         route_after_plan_validation,
         {
-            "retriever": "retriever",
+            "query_rewriter": "query_rewriter",
             "unsupported": "unsupported",
         },
+    )
+    builder.add_edge(
+        "query_rewriter",
+        "retriever",
     )
 
     # Retriever 根据检索结果选择 Reader 或 Fallback
@@ -227,6 +237,7 @@ def save_graph_definition(graph):
 def run_langgraph_research_workflow(
     question: str,
     output_path: str = "outputs/langgraph_research_report.md",
+    conversation_history: list[dict] | None = None,
 ):
     """运行多角色研究工作流。"""
 
@@ -236,6 +247,7 @@ def run_langgraph_research_workflow(
     initial_state: ResearchGraphState = {
         "question": question,
         "output_path": output_path,
+        "conversation_history": conversation_history or [],
         "status": "started",
         "planned_tools": [],
         "review_count": 0,

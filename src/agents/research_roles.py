@@ -118,7 +118,7 @@ def route_after_plan_validation(state: ResearchGraphState):
     """根据计划校验结果选择执行分支。"""
 
     if state.get("plan_valid") is True:
-        return "retriever"
+        return "query_rewriter"
 
     return "unsupported"
 
@@ -139,19 +139,77 @@ def unsupported_node(state: ResearchGraphState):
     }
 
 
+def query_rewriter_node(state: ResearchGraphState):
+    """根据对话历史，把当前问题改写成完整问题。"""
+
+    history = state.get(
+        "conversation_history",
+        [],
+    )
+
+    current_question = state["question"]
+
+    # 没有历史时，不需要额外调用模型
+    if not history:
+        return {
+            "retrieval_question": current_question,
+            "status": "query_rewrite_skipped",
+        }
+
+    history_lines = []
+
+    for message in history[-6:]:
+        history_lines.append(
+            f"{message.get('role', '')}: " f"{message.get('content', '')}"
+        )
+
+    config = load_config()
+
+    rewritten_question = generate_text(
+        api_key=config["deepseek_api_key"],
+        model=config["deepseek_model"],
+        api_base=config["deepseek_api_base"],
+        system_prompt=(
+            "你是一个问题改写器。"
+            "请结合对话历史，把当前问题改写成独立、完整的问题。"
+            "只返回改写后的问题，不要解释。"
+        ),
+        user_input=(
+            "对话历史：\n"
+            + "\n".join(history_lines)
+            + "\n\n当前问题：\n"
+            + current_question
+        ),
+    ).strip()
+
+    if not rewritten_question:
+        rewritten_question = current_question
+
+    return {
+        "retrieval_question": rewritten_question,
+        "status": "query_rewrite_completed",
+    }
+
+
 def retriever_node(state: ResearchGraphState):
     """Retriever：从知识库中检索相关资料。"""
+
+    retrieval_question = state.get(
+        "retrieval_question",
+        state["question"],
+    )
 
     result = execute_tool(
         "search_knowledge_base",
         {
-            "question": state["question"],
+            "question": retrieval_question,
             "top_k": 3,
         },
     )
 
     return {
         "retrieved_items": result.get("items", []),
+        "retrieval_question": retrieval_question,
         "status": "retrieval_completed",
     }
 
@@ -175,6 +233,26 @@ def reader_node(state: ResearchGraphState):
         state["question"],
         context,
     )
+
+    conversation_history = state.get(
+        "conversation_history",
+        [],
+    )
+
+    if conversation_history:
+        history_lines = []
+
+        # 只保留最近 6 条消息
+        for message in conversation_history[-6:]:
+            history_lines.append(
+                f"{message.get('role', '')}: " f"{message.get('content', '')}"
+            )
+
+        prompt += (
+            "\n\n之前的对话历史：\n"
+            + "\n".join(history_lines)
+            + "\n请结合历史理解当前问题。\n"
+        )
 
     # 如果上一次审核失败，将反馈加入本轮提示词
     review_feedback = state.get("review_feedback", "")
