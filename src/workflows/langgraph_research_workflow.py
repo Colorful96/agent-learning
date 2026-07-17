@@ -1,10 +1,12 @@
 from pathlib import Path
 import json
+import logging
 from langgraph.graph import END, START, StateGraph
 from src.agents.research_roles import (
     fallback_node,
     planner_node,
     plan_validator_node,
+    direct_answer_node,
     reader_node,
     retriever_node,
     reviewer_node,
@@ -17,6 +19,9 @@ from src.agents.research_roles import (
 )
 
 from src.agents.research_state import ResearchGraphState
+
+
+logger = logging.getLogger("agent_workflow")
 
 
 def find_plan_step_for_node(state, node_name):
@@ -34,6 +39,9 @@ def find_plan_step_for_node(state, node_name):
             return index, step
 
         if node_name == "writer" and tool_name == "save_markdown_report":
+            return index, step
+
+        if node_name == "direct_answer" and tool_name is None:
             return index, step
 
         if node_name == "reader" and tool_name is None:
@@ -61,6 +69,7 @@ def tracked_node(node_name, node_function):
                 "node": node_name,
             }
         )
+        logger.info("node_started node=%s", node_name)
 
         # 执行真正的角色逻辑
         updates = node_function(state)
@@ -98,6 +107,11 @@ def tracked_node(node_name, node_function):
                 "node": node_name,
                 "status": updates.get("status"),
             }
+        )
+        logger.info(
+            "node_completed node=%s status=%s",
+            node_name,
+            updates.get("status"),
         )
 
         return {
@@ -167,6 +181,11 @@ def build_research_graph():
     )
 
     builder.add_node(
+        "direct_answer",
+        tracked_node("direct_answer", direct_answer_node),
+    )
+
+    builder.add_node(
         "writer",
         tracked_node("writer", writer_node),
     )
@@ -181,6 +200,7 @@ def build_research_graph():
         route_after_plan_validation,
         {
             "query_rewriter": "query_rewriter",
+            "direct_answer": "direct_answer",
             "unsupported": "unsupported",
         },
     )
@@ -215,6 +235,7 @@ def build_research_graph():
     # 没有资料或任务类型不支持时，都保存说明性结果
     builder.add_edge("fallback", "writer")
     builder.add_edge("unsupported", "writer")
+    builder.add_edge("direct_answer", END)
     builder.add_edge("writer", END)
 
     return builder.compile()
@@ -238,6 +259,7 @@ def run_langgraph_research_workflow(
     question: str,
     output_path: str = "outputs/langgraph_research_report.md",
     conversation_history: list[dict] | None = None,
+    source: str | None = None,
 ):
     """运行多角色研究工作流。"""
 
@@ -246,6 +268,9 @@ def run_langgraph_research_workflow(
 
     initial_state: ResearchGraphState = {
         "question": question,
+        "source": source,
+        "workflow_type": "research",
+        "skill_name": "literature_research",
         "output_path": output_path,
         "conversation_history": conversation_history or [],
         "status": "started",

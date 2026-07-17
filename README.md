@@ -1,292 +1,224 @@
-# Agent Learning
+# Research Agent
 
-这是一个用于学习智能体开发的科研文献 Agent 应用 Demo。
+[![CI](https://github.com/Colorful96/agent-learning/actions/workflows/ci.yml/badge.svg)](https://github.com/Colorful96/agent-learning/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-项目目标是让 Agent 能够读取 TXT、Word 和 PDF 资料，建立本地知识库，根据用户问题进行检索和分析，生成带引用来源的研究回答，并通过 FastAPI 和 Streamlit 提供可交互的应用界面。
+一个面向科研文献问答的 Agent 应用示例。
 
-## 当前定位
+项目支持导入 TXT、Word 和 PDF，建立本地知识库，根据问题选择直接回答或检索式研究流程，返回带引用来源的答案，并生成 Markdown 报告。项目同时展示了 LangGraph、RAG、工具调用、MCP、Skill、FastAPI、Streamlit 和 SQLite 的工程化组合方式。
 
-当前项目已经是一个具备 Agent 特征的科研文献应用 Demo，但还不是生产级智能体平台。
+> This repository is an educational but runnable research-agent application. It is designed to make the architecture understandable and easy to extend.
 
-当前主流程如下：
+## Features
 
-```text
-用户问题
-    -> FastAPI
-    -> LangGraph Research Workflow
-    -> Planner
-    -> PlanValidator
-    -> QueryRewriter
-    -> Retriever
-    -> Reader
-    -> Reviewer
-    -> Writer
-    -> 返回回答、引用来源和 Markdown 报告
-```
+- 文档导入：支持 TXT、DOCX 和 PDF
+- RAG：文本切分、Embedding、Chroma、混合检索和可选重排
+- 动态路由：Planner 在 direct_answer 和 research 之间选择
+- 研究工作流：Planner -> Validator -> Query Rewriter -> Retriever -> Reader -> Reviewer -> Writer
+- 工具系统：本地工具注册表，可选 MCP 后端
+- Skill：literature_research 和 direct_qa
+- 记忆：SQLite 会话和消息持久化，以及 JSONL 长期记忆示例
+- 接口：FastAPI API 和 Streamlit 页面
+- 工程能力：请求 ID、日志、API Token、路径校验、评测和测试
+- 部署配置：Dockerfile 和 Docker Compose
 
-## 已实现功能
+## Architecture
 
-### 模型与提示词
+~~~mermaid
+flowchart LR
+    User[User] --> UI[Streamlit]
+    UI --> API[FastAPI]
+    API --> Graph[LangGraph]
+    Graph --> Planner[Planner]
+    Planner --> Route{Workflow type}
+    Route -->|direct_answer| Direct[Direct QA Skill]
+    Route -->|research| Research[Literature Research Skill]
+    Research --> Retriever[Retriever]
+    Retriever --> Vector[(Chroma)]
+    Research --> Reader[Reader]
+    Reader --> Reviewer[Reviewer]
+    Reviewer --> Writer[Writer]
+    Writer --> Report[Markdown report]
+    Graph --> Tools[Local tools / MCP tools]
+    API --> SQLite[(SQLite)]
+~~~
 
-- 使用 DeepSeek API 调用大语言模型
-- 普通文本摘要
-- 结构化 JSON 输出
-- 多种 Prompt 风格
-- Pydantic 结果校验
-- 规则评测和语义 RAG 评测
+## Quick Start
 
-### Agent 工程能力
+### 1. 创建虚拟环境
 
-- 本地工具调用
-- 工具注册表
-- 多轮工具调用
-- Planner 任务计划
-- PlanValidator 计划校验
-- LangGraph StateGraph 工作流
-- Reader、Reviewer、Writer 等角色节点
-- 条件路由和 Reviewer 循环
-- `current_step`、`completed_steps` 和执行轨迹
-
-### RAG 知识库
-
-- TXT、DOCX、PDF 文档解析
-- chunk 切分
-- embedding 向量化
-- Chroma 本地向量数据库
-- 语义检索
-- 可选 reranker
-- 返回 `chunk_id`、来源文件和文本位置
-- 文档上传、列表和删除
-
-### 记忆与应用接口
-
-- Streamlit 页面短期对话
-- JSONL 长期记忆 Demo
-- SQLite 会话和消息持久化
-- 页面刷新后恢复历史会话
-- FastAPI 研究接口
-- Markdown 报告下载接口
-- API 请求日志和统一异常处理
-- FastAPI 接口测试
-
-## 当前架构
-
-```text
-Streamlit 前端
-    -> FastAPI API
-        -> LangGraph 工作流
-            -> Planner / Retriever / Reader / Reviewer / Writer
-                -> 本地工具
-                -> Chroma 向量数据库
-                -> DeepSeek API
-                -> SQLite 会话数据库
-```
-
-## 环境准备
-
-创建并激活虚拟环境：
-
-```powershell
+~~~powershell
 python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-安装依赖：
-
-```powershell
+.venv/Scripts/Activate.ps1
 pip install -r requirements.txt
-```
+~~~
 
-创建环境变量文件：
+### 2. 配置模型
 
-```powershell
+~~~powershell
 Copy-Item .env.example .env
-```
+~~~
 
-在 `.env` 中填写模型配置：
+编辑 .env：
 
-```text
+~~~text
 DEEPSEEK_API_KEY=your_api_key_here
-DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_API_BASE=https://api.deepseek.com
-```
+AGENT_API_TOKEN=
+AGENT_TOOL_BACKEND=local
+~~~
 
-## 常用命令
+不要提交 .env，也不要在公开环境中暴露 API Key。
 
-### 文本摘要
+### 3. 启动应用
 
-```powershell
-python -m src.main examples\sample.txt
-```
+终端 1：
 
-结构化摘要：
+~~~powershell
+python -m uvicorn src.api.app:app --reload
+~~~
 
-```powershell
-python -m src.main examples\agent_complex.txt --structured
-```
+终端 2：
 
-指定 Prompt 风格：
+~~~powershell
+python -m streamlit run frontend/streamlit_app.py
+~~~
 
-```powershell
-python -m src.main examples\agent_complex.txt --structured --style research
-```
+打开 http://localhost:8501。
 
-### 工具调用
+## CLI Examples
 
-```powershell
-python -m src.demos.tool_registry_demo
-python -m src.demos.model_tool_call_demo
-```
+建立索引：
 
-### RAG
-
-建立向量索引：
-
-```powershell
-python -m src.demos.build_rag_index --file examples\agent_rag_notes.txt
-```
-
-查看知识库来源：
-
-```powershell
-python -m src.demos.list_rag_sources
-```
+~~~powershell
+python -m src.demos.build_rag_index --file examples/agent_rag_notes.txt
+~~~
 
 运行语义检索：
 
-```powershell
-python -m src.demos.semantic_rag_demo `
-    "FastAPI 在这个项目里有什么作用？" `
-    --file examples\agent_rag_notes.txt
-```
+~~~powershell
+python -m src.demos.semantic_rag_demo "FastAPI 在这个项目里有什么作用？" --file examples/agent_rag_notes.txt
+~~~
 
-### LangGraph 研究工作流
+运行 LangGraph 研究工作流：
 
-```powershell
-python -m src.demos.langgraph_research_demo `
-    "FastAPI 在这个项目里有什么作用？"
-```
+~~~powershell
+python -m src.demos.langgraph_research_demo "FastAPI 在这个项目里有什么作用？"
+~~~
 
-查看最终状态和执行轨迹：
+查看工作流状态和图：
 
-```powershell
-Get-Content -Encoding UTF8 outputs\langgraph_final_state.json
-```
+~~~powershell
+Get-Content -Encoding UTF8 outputs/langgraph_final_state.json
+Get-Content -Encoding UTF8 outputs/langgraph_workflow.mmd
+~~~
 
-查看 Graph 结构：
+运行 MCP 发现示例：
 
-```powershell
-Get-Content -Encoding UTF8 outputs\langgraph_workflow.mmd
-```
+~~~powershell
+python -m src.demos.mcp_demo
+~~~
 
-### 评测
+使用 MCP 作为工具后端：
 
-```powershell
+~~~powershell
+$env:AGENT_TOOL_BACKEND="mcp"
+python -m src.demos.tool_registry_demo
+Remove-Item Env:AGENT_TOOL_BACKEND
+~~~
+
+## API
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | /health | 健康检查 |
+| POST | /documents/upload | 上传并索引 TXT/DOCX/PDF |
+| GET | /documents | 查看已上传文档和元数据 |
+| DELETE | /documents/{filename} | 删除文档及其切片 |
+| POST | /research | 运行研究 Agent |
+| GET | /reports/{filename} | 下载 Markdown 报告 |
+| GET | /sessions/{session_id}/messages | 恢复会话历史 |
+
+POST /research 支持可选的 source 字段，用于限制检索范围：
+
+~~~json
+{
+  "question": "FastAPI 在这个项目里有什么作用？",
+  "source": "data/uploads/agent_rag_notes.txt"
+}
+~~~
+
+配置 AGENT_API_TOKEN 后，受保护接口需要携带 X-API-Key。
+
+## Repository Layout
+
+~~~text
+agent-learning/
+|-- frontend/                 Streamlit 页面
+|-- src/
+|   |-- agents/               Planner、角色节点和图状态
+|   |-- api/                  FastAPI 路由和中间件
+|   |-- clients/              LLM 客户端
+|   |-- core/                 摘要和结构化输出逻辑
+|   |-- demos/                可运行的学习示例和集成示例
+|   |-- evaluation/           工作流评测
+|   |-- ingestion/            TXT/DOCX/PDF 加载和索引
+|   |-- integrations/         MCP Server 和 Client
+|   |-- memory/               JSONL 记忆示例
+|   |-- rag/                  切分、Embedding、检索和提示词组装
+|   |-- skills/               可复用 Agent 能力
+|   |-- storage/              SQLite 持久化
+|   |-- tools/                本地工具和注册表
+|   |-- workflows/            LangGraph 工作流
+|-- docs/                     架构和学习笔记
+|-- examples/                 示例资料
+|-- tests/                    自动化测试
+|-- Dockerfile
+|-- docker-compose.yml
++-- README.md
+~~~
+
+正式运行链路不依赖 demo 模块。运行时共用的 RAG 提示词组装逻辑位于 src/rag/prompt_builder.py；src/demos/ 中的文件是可执行示例和实验入口。
+
+## Data and Security
+
+运行时数据会被 Git 忽略：
+
+~~~text
+data/uploads/       上传的文档
+data/chroma/        Chroma 数据库
+data/agent.db       SQLite 会话和消息
+outputs/            报告、轨迹、日志和评测结果
+~~~
+
+本地工具将文件读取限制在 examples/ 和 data/uploads/，将报告写入限制在 outputs/。这是本地开发基线，不等同于完整的生产安全边界。
+
+## Testing and Evaluation
+
+~~~powershell
+python -m compileall src frontend
 python -m pytest tests -ra
-python -m src.rag.semantic_rag_batch_eval
-```
+python -m src.evaluation.workflow_evaluator
+~~~
 
-## 启动应用
+测试覆盖 API 校验、会话持久化、source 转发、动态路由、Skill 选择、路径安全和 API Token 保护。
 
-启动 FastAPI：
+## Docker
 
-```powershell
-python -m uvicorn src.api.app:app --reload
-```
+Docker 配置不是本地开发的必需项：
 
-启动 Streamlit：
+~~~powershell
+docker compose up --build
+~~~
 
-```powershell
-python -m streamlit run frontend\streamlit_app.py
-```
+API 暴露在 8000 端口，Streamlit 暴露在 8501 端口。首次构建可能下载较大的 Embedding 和重排模型。
 
-浏览器访问：
+## Contributing
 
-```text
-http://localhost:8501
-```
+请阅读 CONTRIBUTING.md，了解开发环境、测试要求和 Pull Request 规范。
 
-## 主要 API
+## License
 
-```text
-GET  /health
-POST /documents/upload
-GET  /documents
-DELETE /documents/{filename}
-POST /research
-GET  /reports/{filename}
-GET  /sessions/{session_id}/messages
-```
-
-示例：
-
-```powershell
-$body = @{
-    question = "FastAPI 在这个项目里有什么作用？"
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-    -Uri http://127.0.0.1:8000/research `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body $body
-```
-
-## 数据目录
-
-```text
-data/uploads/       上传的 TXT、DOCX、PDF 文件
-data/chroma/        Chroma 向量数据库
-data/agent.db       SQLite 会话和消息数据库
-outputs/             报告、评测结果和运行轨迹
-```
-
-这些运行时数据默认不提交到 Git。
-
-## 项目结构
-
-```text
-agent_learning/
-├── examples/                  示例资料
-├── frontend/
-│   └── streamlit_app.py       Streamlit 前端
-├── prompts/                   Prompt 文档
-├── src/
-│   ├── agents/                Agent 角色和状态
-│   ├── api/                   FastAPI 接口
-│   ├── clients/               大模型客户端
-│   ├── core/                  摘要和评测核心逻辑
-│   ├── demos/                 命令行 Demo
-│   ├── ingestion/             TXT、Word、PDF 解析
-│   ├── memory/                长期记忆 Demo
-│   ├── rag/                   切分、embedding、检索和向量库
-│   ├── storage/               SQLite 存储
-│   ├── tools/                 本地工具和工具注册表
-│   └── workflows/             LangGraph 工作流
-├── tests/                     自动化测试
-├── requirements.txt
-└── README.md
-```
-
-## 后续计划
-
-```text
-1. 文档元数据和知识库筛选
-2. Planner 动态选择不同工作流分支
-3. MCP 外部工具接入
-4. Skill 能力模块封装
-5. 评测、日志、权限和安全完善
-6. 最后再考虑 Docker 部署
-```
-
-当前项目的学习重点是理解完整 Agent 应用的工程流程：
-
-```text
-需求
-    -> 模块设计
-    -> 工具和工作流实现
-    -> RAG 和记忆
-    -> API 和前端
-    -> 测试与评测
-    -> Git 版本管理
-```
+项目采用 MIT License。

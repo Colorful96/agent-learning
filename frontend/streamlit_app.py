@@ -16,6 +16,10 @@ API_BASE_URL = os.getenv(
 API_URL = f"{API_BASE_URL}/research"
 UPLOAD_URL = f"{API_BASE_URL}/documents/upload"
 DOCUMENTS_URL = f"{API_BASE_URL}/documents"
+selected_source = None
+API_HEADERS = {}
+if os.getenv("AGENT_API_TOKEN"):
+    API_HEADERS["X-API-Key"] = os.getenv("AGENT_API_TOKEN")
 
 st.set_page_config(
     page_title="科研文献智能体",
@@ -38,6 +42,7 @@ if (
         history_response = requests.get(
             f"{API_BASE_URL}/sessions/"
             f"{st.session_state.session_id}/messages",
+            headers=API_HEADERS,
             timeout=30,
         )
 
@@ -79,6 +84,7 @@ if upload_submitted:
                             uploaded_file.type or "application/octet-stream",
                         )
                     },
+                    headers=API_HEADERS,
                     timeout=180,
                 )
 
@@ -109,6 +115,7 @@ st.subheader("已上传文档")
 try:
     documents_response = requests.get(
         DOCUMENTS_URL,
+        headers=API_HEADERS,
         timeout=30,
     )
 
@@ -121,6 +128,21 @@ try:
                 hide_index=True,
             )
             document_names = [document["filename"] for document in documents]
+
+            source_options = {"全部资料": None}
+            source_options.update(
+                {
+                    document["filename"]: document["source"]
+                    for document in documents
+                }
+            )
+
+            selected_source_label = st.selectbox(
+                "限定检索范围",
+                list(source_options),
+                key="selected_source",
+            )
+            selected_source = source_options[selected_source_label]
 
             selected_filename = st.selectbox(
                 "选择要删除的文档",
@@ -135,6 +157,7 @@ try:
                 try:
                     delete_response = requests.delete(
                         f"{DOCUMENTS_URL}/" f"{quote(selected_filename, safe='')}",
+                        headers=API_HEADERS,
                         timeout=30,
                     )
 
@@ -201,7 +224,9 @@ if st.button("开始研究", type="primary"):
                     json={
                         "question": question,
                         "session_id": st.session_state.session_id,
+                        "source": selected_source,
                     },
+                    headers=API_HEADERS,
                     timeout=180,
                 )
 
@@ -290,6 +315,7 @@ if st.button("开始研究", type="primary"):
                 if report_url:
                     report_response = requests.get(
                         f"{API_BASE_URL}{report_url}",
+                        headers=API_HEADERS,
                         timeout=30,
                     )
 

@@ -24,6 +24,7 @@ from src.clients.llm_client import LLMClientError
 import time
 import uuid
 from pathlib import Path
+import os
 
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
@@ -50,6 +51,7 @@ class DocumentInfo(BaseModel):
     """已上传文档信息。"""
 
     filename: str
+    source: str
     file_type: str
     size_bytes: int
 
@@ -84,6 +86,7 @@ class ResearchRequest(BaseModel):
     """研究接口请求模型。"""
 
     session_id: str | None = None
+    source: str | None = None
     history: list[ConversationMessage] = Field(
         default_factory=list,
         max_length=10,
@@ -115,11 +118,30 @@ app = FastAPI(
     version="0.1.0",
 )
 
+Path("outputs").mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
 logging.basicConfig(
     level=logging.INFO,
     format=("%(asctime)s " "%(levelname)s " "%(name)s " "%(message)s"),
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(
+            "outputs/app.log",
+            encoding="utf-8",
+        ),
+    ],
 )
 logger = logging.getLogger("agent_api")
+
+PUBLIC_PATHS = {
+    "/health",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+}
 
 
 @app.middleware("http")
@@ -133,6 +155,22 @@ async def request_logging_middleware(
 
     request.state.request_id = request_id
     start_time = time.perf_counter()
+
+    configured_token = os.getenv("AGENT_API_TOKEN", "").strip()
+    request_token = request.headers.get("X-API-Key", "")
+
+    if configured_token and request.url.path not in PUBLIC_PATHS:
+        if request_token != configured_token:
+            response = JSONResponse(
+                status_code=401,
+                content={
+                    "code": "unauthorized",
+                    "message": "缺少有效的 API Token。",
+                    "request_id": request_id,
+                },
+            )
+            response.headers["X-Request-ID"] = request_id
+            return response
 
     try:
         response = await call_next(request)
@@ -343,11 +381,16 @@ def research(request: ResearchRequest):
         message.model_dump() for message in request.history
     ]
 
-    result = run_langgraph_research_workflow(
-        question=request.question,
-        output_path="outputs/api_research_report.md",
-        conversation_history=conversation_history,
-    )
+    workflow_arguments = {
+        "question": request.question,
+        "output_path": "outputs/api_research_report.md",
+        "conversation_history": conversation_history,
+    }
+
+    if request.source:
+        workflow_arguments["source"] = request.source
+
+    result = run_langgraph_research_workflow(**workflow_arguments)
 
     answer = result.get("answer", "")
 

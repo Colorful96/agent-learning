@@ -4,7 +4,7 @@ from pathlib import Path
 
 from src.clients.llm_client import generate_text
 from src.config import load_config
-from src.demos.semantic_rag_demo import build_context, build_rag_prompt
+from src.rag.prompt_builder import build_context, build_rag_prompt
 from src.tools.registry import execute_tool
 
 

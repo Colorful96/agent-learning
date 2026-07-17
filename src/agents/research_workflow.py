@@ -4,7 +4,7 @@ from pathlib import Path
 from src.agents.state import AgentState
 from src.clients.llm_client import generate_text
 from src.config import load_config
-from src.demos.semantic_rag_demo import (
+from src.rag.prompt_builder import (
     build_context,
     build_rag_prompt,
 )

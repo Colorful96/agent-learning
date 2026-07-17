@@ -1,8 +1,38 @@
 from pathlib import Path
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+EXAMPLES_DIR = (PROJECT_ROOT / "examples").resolve()
+UPLOADS_DIR = (PROJECT_ROOT / "data" / "uploads").resolve()
+OUTPUTS_DIR = (PROJECT_ROOT / "outputs").resolve()
+MAX_REPORT_CONTENT_SIZE = 500_000
+
+
+def _resolve_allowed_path(path: str, allowed_root: Path) -> Path:
+    """解析路径，并确保它位于指定目录内。"""
+
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = PROJECT_ROOT / candidate
+
+    resolved = candidate.resolve()
+    if resolved != allowed_root and allowed_root not in resolved.parents:
+        raise ValueError(f"路径不在允许的目录内：{path}")
+
+    return resolved
+
+
 def read_text_file(path: str) -> str:
-    file_path = Path(path)
+    file_path = None
+    for allowed_root in (EXAMPLES_DIR, UPLOADS_DIR):
+        try:
+            file_path = _resolve_allowed_path(path, allowed_root)
+            break
+        except ValueError:
+            continue
+
+    if file_path is None:
+        raise ValueError("只能读取 examples 或 data/uploads 中的文件")
 
     if not file_path.exists():
         raise ValueError(f"File does not exist: {path}")
@@ -24,7 +54,10 @@ def count_text_stats(text: str) -> dict:
 
 
 def save_markdown_report(title: str, content: str, output_path: str) -> str:
-    path = Path(output_path)
+    if len(content) > MAX_REPORT_CONTENT_SIZE:
+        raise ValueError("报告内容不能超过 500000 个字符")
+
+    path = _resolve_allowed_path(output_path, OUTPUTS_DIR)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     markdown = f"# {title}\n\n{content}\n"

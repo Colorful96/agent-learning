@@ -1,0 +1,24 @@
+services:
+  api:
+    build: .
+    env_file:
+      - .env
+    environment:
+      AGENT_TOOL_BACKEND: ${AGENT_TOOL_BACKEND:-local}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+
+  frontend:
+    build: .
+    env_file:
+      - .env
+    environment:
+      AGENT_API_BASE_URL: http://api:8000
+    command: ["python", "-m", "streamlit", "run", "frontend/streamlit_app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+    depends_on:
+      - api
+    ports:
+      - "8501:8501"

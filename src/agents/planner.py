@@ -1,4 +1,5 @@
 import json
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -32,6 +33,8 @@ class TaskPlan(BaseModel):
     """表示大模型生成的完整任务计划。"""
 
     goal: str
+    workflow_type: Literal["research", "direct_answer"] = "research"
+    skill_name: Literal["literature_research", "direct_qa"] = "literature_research"
     steps: list[PlanStep]
 
 
@@ -43,6 +46,10 @@ def validate_plan(plan):
 
     if len(plan.steps) > 5:
         raise ValueError("计划步骤不能超过 5 步。")
+
+    if plan.workflow_type == "direct_answer":
+        if any(step.tool_name for step in plan.steps):
+            raise ValueError("direct_answer 不应该包含工具调用。")
 
     for step in plan.steps:
         if step.tool_name is not None:
@@ -83,6 +90,8 @@ def build_plan_with_llm(
             "\n\nJSON 格式必须是：",
             "\n{",
             '\n  "goal": "任务目标",',
+            '\n  "workflow_type": "research 或 direct_answer",',
+            '\n  "skill_name": "literature_research 或 direct_qa",',
             '\n  "steps": [',
             "\n    {",
             '\n      "step_id": "step-1",',

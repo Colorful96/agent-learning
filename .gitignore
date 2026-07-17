@@ -7,3 +7,8 @@ data/
 data/*.db
 data/uploads/
 data/chroma/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+Thumbs.db

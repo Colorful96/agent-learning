@@ -5,6 +5,9 @@ class ResearchGraphState(TypedDict, total=False):
     """研究工作流中所有角色共享的状态。"""
 
     question: str
+    source: str | None
+    workflow_type: str
+    skill_name: str
     conversation_history: list[dict]
     output_path: str
     plan: list[str]

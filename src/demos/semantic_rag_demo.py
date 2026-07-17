@@ -8,6 +8,7 @@ from src.config import load_config
 # from src.rag.chroma_store import query_vector_index
 from src.rag.hybrid_retriever import retrieve_hybrid
 from src.rag.reranker import rerank
+from src.rag.prompt_builder import build_context, build_rag_prompt
 
 
 def parse_args():
@@ -39,46 +40,6 @@ def parse_args():
         help="最大距离阈值；distance 越小越相关，超过阈值的 chunk 会被过滤。",
     )
     return parser.parse_args()
-
-
-def build_context(retrieved_items):
-    """把向量检索结果整理成模型可读的上下文。"""
-
-    context_parts = []
-
-    for index, item in enumerate(retrieved_items, start=1):
-        chunk = item["chunk"]
-        distance = item["distance"]
-
-        context_parts.append(
-            (
-                f"[资料 {index}]\n"
-                f"chunk_id：{chunk['id']}\n"
-                f"source：{chunk['source']}\n"
-                f"distance：{distance}\n"
-                f"位置：{chunk['start']} - {chunk['end']}\n"
-                f"内容：\n{chunk['content']}"
-            )
-        )
-
-    return "\n\n".join(context_parts)
-
-
-def build_rag_prompt(question, context):
-    """构造 RAG 提示词，让模型基于检索资料回答。"""
-
-    return (
-        "资料如下：\n"
-        f"{context}\n\n"
-        "问题：\n"
-        f"{question}\n\n"
-        "请用中文回答。\n"
-        "回答要求：\n"
-        "1. 先直接给出结论。\n"
-        "2. 再用自己的话简要说明依据，不要大段复制原文。\n"
-        "3. 最后用“来源：chunk_id, source”的格式列出依据来源。\n"
-        "4. 如果资料中没有答案，请只回答：资料中没有足够信息。"
-    )
 
 
 def save_semantic_rag_trace(

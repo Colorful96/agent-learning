@@ -6,6 +6,7 @@ from src.ingestion.document_loader import (
 from src.rag.chroma_store import (
     build_vector_index,
     delete_vector_index_by_source,
+    normalize_source,
 )
 
 UPLOAD_DIR = Path("data/uploads")
@@ -77,6 +78,7 @@ def list_uploaded_documents() -> list[dict]:
         documents.append(
             {
                 "filename": path.name,
+                "source": normalize_source(str(path)),
                 "file_type": path.suffix.lower().lstrip("."),
                 "size_bytes": path.stat().st_size,
             }

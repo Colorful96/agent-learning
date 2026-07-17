@@ -1,12 +1,13 @@
 from src.agents.research_state import ResearchGraphState
 from src.clients.llm_client import generate_text
 from src.config import load_config
-from src.demos.semantic_rag_demo import (
+from src.rag.prompt_builder import (
     build_context,
     build_rag_prompt,
 )
 from src.tools.registry import execute_tool
 from src.agents.planner import build_plan_with_llm
+from src.skills.registry import get_skill
 import json
 
 from pydantic import BaseModel
@@ -29,9 +30,10 @@ def planner_node(state: ResearchGraphState):
         config=config,
         task=(
             f"用户问题：{state['question']}\n"
-            "这是一个科研文献研究工作流。"
-            "计划必须包含 search_knowledge_base，"
-            "并且必须包含 save_markdown_report。"
+            "请先判断应该使用哪一种工作流。"
+            "如果问题只需要常规解释或简单回答，使用 direct_answer。"
+            "如果问题要求基于上传资料、知识库或文献进行研究，使用 research。"
+            "research 计划必须包含 search_knowledge_base 和 save_markdown_report。"
         ),
         allowed_tools={
             "search_knowledge_base",
@@ -58,9 +60,14 @@ def planner_node(state: ResearchGraphState):
     ]
 
     plan_steps = [step.model_dump() for step in task_plan.steps]
+    skill_name = task_plan.skill_name
+    if task_plan.workflow_type == "direct_answer":
+        skill_name = "direct_qa"
 
     return {
         "plan": plan_text,
+        "workflow_type": task_plan.workflow_type,
+        "skill_name": skill_name,
         "plan_steps": plan_steps,
         "plan_index": 0,
         "current_plan_step": (
@@ -87,15 +94,24 @@ def plan_validator_node(state: ResearchGraphState):
     """校验 Planner 生成的计划是否适合当前研究 Workflow。"""
 
     planned_tools = set(state.get("planned_tools", []))
+    workflow_type = state.get("workflow_type", "research")
 
     unsupported_tools = planned_tools - SUPPORTED_RESEARCH_TOOLS
 
     errors = []
 
+    if workflow_type not in {"research", "direct_answer"}:
+        errors.append(f"不支持的 Workflow 类型：{workflow_type}")
+
+    if workflow_type == "direct_answer" and planned_tools:
+        errors.append("direct_answer Workflow 不应该包含工具调用。")
+
     if unsupported_tools:
         errors.append(f"当前 Workflow 不支持工具：{unsupported_tools}")
 
-    missing_tools = REQUIRED_RESEARCH_TOOLS - planned_tools
+    missing_tools = set()
+    if workflow_type == "research":
+        missing_tools = REQUIRED_RESEARCH_TOOLS - planned_tools
 
     if missing_tools:
         errors.append(f"研究任务计划中缺少必要工具：{missing_tools}")
@@ -118,6 +134,8 @@ def route_after_plan_validation(state: ResearchGraphState):
     """根据计划校验结果选择执行分支。"""
 
     if state.get("plan_valid") is True:
+        if state.get("workflow_type") == "direct_answer":
+            return "direct_answer"
         return "query_rewriter"
 
     return "unsupported"
@@ -136,6 +154,36 @@ def unsupported_node(state: ResearchGraphState):
             "当前任务计划无法由本研究 Workflow 执行。\n\n" f"原因：{plan_error}"
         ),
         "status": "unsupported_task",
+    }
+
+
+def direct_answer_node(state: ResearchGraphState):
+    """直接回答不需要检索本地资料的问题。"""
+
+    config = load_config()
+    history = state.get("conversation_history", [])
+    history_text = "\n".join(
+        f"{message.get('role', '')}: {message.get('content', '')}"
+        for message in history[-6:]
+    )
+
+    prompt = f"用户问题：{state['question']}"
+    if history_text:
+        prompt += f"\n\n对话历史：\n{history_text}"
+
+    skill = get_skill(state.get("skill_name", "direct_qa"))
+
+    answer = generate_text(
+        api_key=config["deepseek_api_key"],
+        model=config["deepseek_model"],
+        api_base=config["deepseek_api_base"],
+        system_prompt=skill.system_prompt,
+        user_input=prompt,
+    )
+
+    return {
+        "answer": answer,
+        "status": "direct_answer_completed",
     }
 
 
@@ -199,12 +247,17 @@ def retriever_node(state: ResearchGraphState):
         state["question"],
     )
 
+    tool_arguments = {
+        "question": retrieval_question,
+        "top_k": 3,
+    }
+
+    if state.get("source"):
+        tool_arguments["source"] = state["source"]
+
     result = execute_tool(
         "search_knowledge_base",
-        {
-            "question": retrieval_question,
-            "top_k": 3,
-        },
+        tool_arguments,
     )
 
     return {
@@ -264,16 +317,13 @@ def reader_node(state: ResearchGraphState):
             "请根据审核意见重新生成回答。"
         )
 
+    skill = get_skill(state.get("skill_name", "literature_research"))
+
     answer = generate_text(
         api_key=config["deepseek_api_key"],
         model=config["deepseek_model"],
         api_base=config["deepseek_api_base"],
-        system_prompt=(
-            "你是一个严谨的科研资料阅读助手。"
-            "只能根据提供的资料回答问题。"
-            "回答必须包含结论、依据和来源。"
-            "如果资料不足，不要编造答案。"
-        ),
+        system_prompt=skill.system_prompt,
         user_input=prompt,
     )
 
@@ -366,10 +416,12 @@ def fallback_node(state: ResearchGraphState):
 def writer_node(state: ResearchGraphState):
     """Writer：把最终回答保存成 Markdown 报告。"""
 
+    skill = get_skill(state.get("skill_name", "literature_research"))
+
     report_path = execute_tool(
         "save_markdown_report",
         {
-            "title": "科研文献调研报告",
+            "title": skill.report_title,
             "content": state["answer"],
             "output_path": state["output_path"],
         },

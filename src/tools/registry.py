@@ -1,9 +1,15 @@
+import os
+import logging
+
 from src.tools.local_tools import (
     count_text_stats,
     read_text_file,
     save_markdown_report,
     search_knowledge_base,
 )
+
+
+logger = logging.getLogger("agent_tools")
 
 TOOL_SCHEMAS = [
     {
@@ -109,8 +115,17 @@ TOOL_FUNCTIONS = {
 
 
 def execute_tool(name: str, arguments: dict):
+    """根据配置通过本地函数或 MCP Server 执行工具。"""
+
+    if os.getenv("AGENT_TOOL_BACKEND", "local") == "mcp":
+        from src.integrations.mcp_client import call_mcp_tool
+
+        logger.info("tool_call name=%s backend=mcp", name)
+        return call_mcp_tool(name, arguments)
+
     if name not in TOOL_FUNCTIONS:
         raise ValueError(f"Unknown tool: {name}")
 
     tool_function = TOOL_FUNCTIONS[name]
+    logger.info("tool_call name=%s backend=local", name)
     return tool_function(**arguments)
